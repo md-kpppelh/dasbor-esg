@@ -21,7 +21,7 @@ function renderMedia(m) {
   return <img src={m.src} alt="" loading="lazy" />;
 }
 
-export function MediaSlot({ id, label = "Media", tag, aspect = "16 / 9", height }) {
+export function MediaSlot({ id, label = "Media", tag, aspect = "16 / 9", height, editable = true }) {
   const key = "esg:media:" + id;
   const [media, setMedia] = useState(() => { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } });
   const [showUrl, setShowUrl] = useState(false);
@@ -40,7 +40,7 @@ export function MediaSlot({ id, label = "Media", tag, aspect = "16 / 9", height 
 
   return (
     <div className="media" style={height ? { height } : { aspectRatio: aspect }}>
-      {media ? renderMedia(media) : (
+      {media ? renderMedia(media) : editable ? (
         <div className="media-empty">
           <div className="ic">＋</div>
           <div className="mono" style={{ fontSize: 12 }}>{label}</div>
@@ -50,30 +50,34 @@ export function MediaSlot({ id, label = "Media", tag, aspect = "16 / 9", height 
           </div>
           {showUrl && <input className="media-url" placeholder="Tempel URL foto/video (mp4, YouTube, Vimeo)…" autoFocus onKeyDown={(e) => e.key === "Enter" && onUrl(e)} onBlur={onUrl} />}
         </div>
+      ) : (
+        <div className="media-empty">
+          <div className="ic" style={{ color: "var(--muted)" }}>▤</div>
+          <div className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>{label}</div>
+          <div className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>Belum ada media</div>
+        </div>
       )}
-      {media && (
-        <>
-          <div className="media-tools">
-            <button className="btn" onClick={() => fileRef.current.click()}>Ganti</button>
-            <button className="btn" onClick={clear}>Hapus</button>
-          </div>
-          {(tag || media.persist === false) && (
-            <div className="media-cap">
-              {tag ? <span className="media-tag">{tag}</span> : <span />}
-              {media.persist === false && <span className="media-tag">preview sesi</span>}
-            </div>
-          )}
-        </>
+      {media && editable && (
+        <div className="media-tools">
+          <button className="btn" onClick={() => fileRef.current.click()}>Ganti</button>
+          <button className="btn" onClick={clear}>Hapus</button>
+        </div>
+      )}
+      {media && (tag || media.persist === false) && (
+        <div className="media-cap">
+          {tag ? <span className="media-tag">{tag}</span> : <span />}
+          {media.persist === false && <span className="media-tag">preview sesi</span>}
+        </div>
       )}
       <input ref={fileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={onFile} />
     </div>
   );
 }
 
-export function MediaGallery({ items }) {
+export function MediaGallery({ items, editable = true }) {
   return (
     <div className="grid g-3">
-      {items.map((it) => <MediaSlot key={it.id} {...it} />)}
+      {items.map((it) => <MediaSlot key={it.id} {...it} editable={editable} />)}
     </div>
   );
 }

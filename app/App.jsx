@@ -86,18 +86,18 @@ export default function App() {
           </span>
           <button className="btn" onClick={toggle}>{theme === "dark" ? "Terang" : "Gelap"}</button>
           {auth
-            ? <><button className="btn" onClick={() => setShowPanel(true)}>Panel</button><button className="btn" onClick={logout}>Keluar</button></>
+            ? <><span className="kick" style={{ color: "var(--accent)" }} title={"Login sebagai " + (auth.user?.nama || auth.user?.username)}>● MODE ADMIN</span><button className="btn" onClick={() => setShowPanel(true)}>Panel</button><button className="btn" onClick={logout}>Keluar</button></>
             : <button className="btn" onClick={() => setShowLogin(true)} disabled={!API_URL} title={API_URL ? "" : "Backend belum tersambung"}>Login</button>}
           <button className="btn btn-primary" onClick={skip}>Dashboard →</button>
         </div>
       </header>
 
-      <Hero model={model} />
+      <Hero model={model} canEdit={!!auth} />
       <VelocityMarquee items={MARQUEE} />
 
       <section className="wrap">
         <SectionHead n="01 / GALERI" title="Galeri & dokumentasi ESG" sub="Unggah foto atau video kegiatan — reklamasi, K3, community development. Bisa file atau tautan (mp4/YouTube/Vimeo)." />
-        <Reveal delay={0.08}><MediaGallery items={GALLERY} /></Reveal>
+        <Reveal delay={0.08}><MediaGallery items={GALLERY} editable={!!auth} /></Reveal>
       </section>
 
       <section className="wrap">

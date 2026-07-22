@@ -11,13 +11,13 @@ export async function fetchDashboard() {
   return { meta: j.meta, months: j.months, metrics: j.metrics, data: j.data, berita: j.berita, config: j.config };
 }
 
-/** POST text/plain agar tak memicu CORS preflight di Apps Script. */
+/** POST text/plain agar tak memicu CORS preflight. `action` di query string (dibaca e.parameter). */
 async function apiPost(action, payload, token) {
   if (!API_URL) throw new Error("API_URL belum diisi (mode seed/offline).");
-  const res = await fetch(API_URL, {
+  const res = await fetch(`${API_URL}?action=${encodeURIComponent(action)}`, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(Object.assign({ action, token }, payload)),
+    body: JSON.stringify(Object.assign({ token }, payload)),
   });
   return res.json();
 }

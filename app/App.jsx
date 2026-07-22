@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { buildModel, model as seedModel } from "./lib/model.js";
 import { fetchDashboard } from "./lib/api.js";
 import { API_URL } from "./lib/config.js";
@@ -8,13 +8,13 @@ import Hero from "./three/Hero.jsx";
 import { MediaGallery } from "./components/Media.jsx";
 import { VelocityMarquee, PillarStack, StoryParallax } from "./components/scrolly.jsx";
 import Dashboard from "./components/Dashboard.jsx";
+import { LoginModal, AdminPanel } from "./components/Admin.jsx";
 
 const STATIC_NEWS = [
   { date: "2025", title: "AREA 2025", desc: "Health Promotion & Investment in People — Asia Responsible Enterprise Awards." },
   { date: "2025", title: "HR Asia 2025", desc: "Best Companies to Work For in Asia." },
   { date: "2022", title: "ISDA 2022 — 7 penghargaan", desc: "Indonesian SDGs Award untuk program keberlanjutan." },
 ];
-
 const GALLERY = [
   { id: "g1", label: "Reklamasi & lingkungan", tag: "ENVIRONMENTAL", aspect: "4 / 3" },
   { id: "g2", label: "K3 / keselamatan kerja", tag: "SOCIAL", aspect: "4 / 3" },
@@ -31,24 +31,28 @@ function SectionHead({ n, title, sub }) {
   );
 }
 
+function loadAuth() { try { return JSON.parse(localStorage.getItem("esg:auth")); } catch { return null; } }
+
 export default function App() {
   const [theme, setTheme] = useState("dark");
   const [model, setModel] = useState(seedModel);
   const [source, setSource] = useState(API_URL ? "loading" : "seed");
+  const [auth, setAuth] = useState(loadAuth);
+  const [showLogin, setShowLogin] = useState(false);
+  const [showPanel, setShowPanel] = useState(false);
   const lenis = useLenis();
 
-  useEffect(() => {
-    if (!API_URL) return;
-    let alive = true;
-    fetchDashboard()
-      .then((d) => { if (alive) { setModel(buildModel(d)); setSource("live"); } })
-      .catch((e) => { if (alive) { setSource("seed"); console.error("Gagal memuat API, pakai seed:", e); } });
-    return () => { alive = false; };
+  const refresh = useCallback(() => {
+    if (!API_URL) return Promise.resolve();
+    return fetchDashboard()
+      .then((d) => { setModel(buildModel(d)); setSource("live"); })
+      .catch((e) => { setSource("seed"); console.error("Gagal memuat API, pakai seed:", e); });
   }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
 
   const idx = model.lastIdx;
   const g = (id) => model.metrics.find((m) => m.id === id);
-
   const MARQUEE = useMemo(() => [
     { value: pct(model.series.total[idx]), label: "ESG Index YTD", color: "var(--rag-green)" },
     { value: pct(g("fuel_ratio").achievement[idx]), label: "Fuel Ratio", color: "var(--accent)" },
@@ -58,16 +62,17 @@ export default function App() {
     { value: pct(g("waste_diverted").achievement[idx]), label: "Waste Diverted", color: "var(--mint)" },
     { value: pct(model.kpis.forecastYearEnd), label: "Forecast Des", color: "var(--rag-yellow)" },
   ], [model]);
-
   const PANELS = useMemo(() => model.categories.map((c) => {
     const lead = c.metrics.slice().sort((a, b) => b.bobot - a.bobot)[0];
     return { ...lead, kategori: c.name };
   }), [model]);
-
   const NEWS = model.berita && model.berita.length ? model.berita : STATIC_NEWS;
 
   const toggle = () => { const t = theme === "dark" ? "light" : "dark"; setTheme(t); document.documentElement.dataset.theme = t; };
   const skip = () => { const el = document.getElementById("dashboard"); if (!el) return; lenis.current ? lenis.current.scrollTo(el, { offset: -16 }) : el.scrollIntoView({ behavior: "smooth" }); };
+  const onLogin = (token, user) => { const a = { token, user }; setAuth(a); localStorage.setItem("esg:auth", JSON.stringify(a)); setShowLogin(false); setShowPanel(true); };
+  const logout = () => { setAuth(null); localStorage.removeItem("esg:auth"); setShowPanel(false); };
+  const onExpired = () => { logout(); alert("Sesi berakhir. Silakan login ulang."); setShowLogin(true); };
 
   const srcDot = { live: ["var(--rag-green)", "LIVE"], seed: ["var(--muted)", "SEED"], loading: ["var(--rag-yellow)", "MEMUAT"] }[source];
 
@@ -79,8 +84,10 @@ export default function App() {
           <span className="kick" title={source === "live" ? "Data dari Google Sheet" : "Data seed statis"}>
             <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 9, background: srcDot[0], marginRight: 6 }} />{srcDot[1]}
           </span>
-          <span className="kick">{model.kpis.dataAsOf}</span>
           <button className="btn" onClick={toggle}>{theme === "dark" ? "Terang" : "Gelap"}</button>
+          {auth
+            ? <><button className="btn" onClick={() => setShowPanel(true)}>Panel</button><button className="btn" onClick={logout}>Keluar</button></>
+            : <button className="btn" onClick={() => setShowLogin(true)} disabled={!API_URL} title={API_URL ? "" : "Backend belum tersambung"}>Login</button>}
           <button className="btn btn-primary" onClick={skip}>Dashboard →</button>
         </div>
       </header>
@@ -104,6 +111,9 @@ export default function App() {
       <StoryParallax panels={PANELS} />
 
       <Dashboard model={model} news={NEWS} />
+
+      {showLogin && <LoginModal onClose={() => setShowLogin(false)} onSuccess={onLogin} />}
+      {showPanel && auth && <AdminPanel token={auth.token} user={auth.user} model={model} onClose={() => setShowPanel(false)} onChanged={refresh} onExpired={onExpired} />}
     </>
   );
 }

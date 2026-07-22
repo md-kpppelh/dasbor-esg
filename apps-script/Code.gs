@@ -15,12 +15,12 @@ function doGet(e) { return handle_(e, "GET"); }
 function doPost(e) { return handle_(e, "POST"); }
 
 function handle_(e, method) {
-  var action = (e && e.parameter && e.parameter.action) || "";
   var body = {};
   if (method === "POST" && e.postData && e.postData.contents) {
     try { body = JSON.parse(e.postData.contents); } catch (_) {}
   }
   var p = Object.assign({}, e.parameter, body);
+  var action = p.action || "";
   try {
     var out;
     switch (action) {

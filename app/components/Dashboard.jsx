@@ -4,23 +4,42 @@ import { buildInsights } from "../lib/insights.js";
 import { pct, num, signedPct, ragColor, ragLabel } from "../lib/format.js";
 import { CountUp, Reveal } from "../lib/anim.jsx";
 import { CATEGORY_ORDER } from "../lib/model.js";
+import { linearForecast } from "../../engine/esg-engine.js";
 
 const SHORT = {
   fuel_ratio: "Fuel", renewable: "Renew", air_bersih: "Air Bersih", air_konservasi: "Konservasi",
   flowmeter: "Flowmeter", limbah_b3: "B3", limbah_domestik: "Domestik", limbah_produksi: "Produksi",
   ltifr: "LTI-FR", comdev: "ComDev", ghg_int: "GHG", water_int: "Air-Int", waste_diverted: "Waste",
 };
+const CAP = 1.25;
+// Capaian kategori per bulan = rata-rata tertimbang bobot sub-metriknya.
+function catAchSeries(cat) {
+  const out = [];
+  for (let i = 0; i < 12; i++) {
+    let w = 0, s = 0;
+    for (const m of cat.metrics) { const a = m.achievement[i]; if (a != null && m.bobot > 0) { w += m.bobot; s += m.bobot * a; } }
+    out.push(w > 0 ? s / w : null);
+  }
+  return out;
+}
+const catPointAt = (cat, i) => cat.metrics.reduce((a, m) => a + (m.points[i] || 0), 0);
 
 export default function Dashboard({ model, news }) {
-  const { months, metrics, series, kpis, forecast, lastIdx } = model;
+  const { months, metrics, series, kpis, forecast, lastIdx, categories } = model;
   const [idx, setIdx] = useState(lastIdx);
   const [mode, setMode] = useState("manajemen"); // manajemen | audit
   const [kategori, setKategori] = useState("all");
 
+  // Fokus kategori: bila kategori dipilih, seluruh angka menyorot kategori itu.
+  const focusCat = kategori === "all" ? null : categories.find((c) => c.name === kategori);
+  const scopeMetrics = focusCat ? focusCat.metrics : metrics;
+  const scope = focusCat ? catAchSeries(focusCat) : series.total;
+  const scopeForecast = focusCat ? linearForecast(scope).map((v) => (v == null ? null : Math.min(Math.max(v, 0), CAP))) : forecast.linear;
+  const scopeVal = scope[idx];
   const totalIdx = series.total[idx];
-  const momentum = idx > 0 && totalIdx != null && series.total[idx - 1] != null ? totalIdx - series.total[idx - 1] : null;
-  const alerts = metrics.filter((m) => m.bobot > 0 && m.achievement[idx] != null && m.achievement[idx] < 1).sort((a, b) => a.achievement[idx] - b.achievement[idx]);
-  const forecastRisk = kpis.forecastYearEnd != null && kpis.forecastYearEnd < kpis.target;
+  const momentum = idx > 0 && scope[idx] != null && scope[idx - 1] != null ? scope[idx] - scope[idx - 1] : null;
+  const alerts = scopeMetrics.filter((m) => m.bobot > 0 && m.achievement[idx] != null && m.achievement[idx] < 1).sort((a, b) => a.achievement[idx] - b.achievement[idx]);
+  const forecastRisk = scopeForecast[11] != null && scopeForecast[11] < kpis.target;
 
   const contrib = useMemo(() => {
     const rows = metrics.map((m) => ({ id: m.id, name: m.name, short: SHORT[m.id] || m.name, point: m.points[idx] }));
@@ -29,9 +48,16 @@ export default function Dashboard({ model, news }) {
   }, [metrics, idx]);
 
   const insights = useMemo(() => buildInsights(model), [model]);
-  const wfItems = contrib.filter((c) => c.point > 0).sort((a, b) => b.point - a.point);
+  const wfItems = contrib.filter((c) => c.point > 0 && (!focusCat || focusCat.metrics.some((m) => m.id === c.id))).sort((a, b) => b.point - a.point);
   const shownMetrics = kategori === "all" ? metrics : metrics.filter((m) => m.kategori === kategori);
-  const kpiList = [
+  const kpiList = focusCat ? [
+    { lbl: "Achievement " + focusCat.name, to: scopeVal, fmt: (v) => pct(v), sub: months[idx] + " 2026", tone: scopeVal >= kpis.target ? "pos" : "neg" },
+    { lbl: "Bobot Kategori", to: focusCat.weight, fmt: (v) => pct(v, 0), sub: "dari total 100%" },
+    { lbl: "ESG Point Kategori", to: catPointAt(focusCat, idx), fmt: (v) => pct(v), sub: months[idx] },
+    { lbl: "Kontribusi ke Index", to: totalIdx ? catPointAt(focusCat, idx) / totalIdx : null, fmt: (v) => pct(v), sub: "dari total index" },
+    { lbl: "Jumlah Metrik", to: focusCat.metrics.length, fmt: (v) => num(v), sub: "sub-metrik" },
+    { lbl: "Forecast Akhir Tahun", to: scopeForecast[11], fmt: (v) => pct(v), sub: "Des (linear)", tone: scopeForecast[11] >= kpis.target ? "pos" : "neg" },
+  ] : [
     { lbl: "ESG Point Bulan Berjalan", to: totalIdx, fmt: (v) => pct(v), sub: months[idx] + " 2026" },
     { lbl: "ESG Point YTD", to: totalIdx, fmt: (v) => pct(v), sub: "s/d " + months[idx] },
     { lbl: "Target Tahunan", to: kpis.target, fmt: (v) => pct(v, 0), sub: "plafon " + pct(kpis.cap, 0) },
@@ -91,13 +117,13 @@ export default function Dashboard({ model, news }) {
       {/* Trend + Gauge */}
       <div className="grid g-2" style={{ marginTop: 16 }}>
         <div className="card">
-          <h3 style={{ fontSize: 16 }}>ESG Achievement Trend</h3>
-          <p className="sec-sub">Actual (garis penuh) · Forecast (putus-putus) · Target 100%{model.yoy2025 ? " · 2025 (titik-titik abu)" : ""}.</p>
-          <TrendChart months={months} actual={series.total} forecast={forecast.linear} yoy={model.yoy2025} target={kpis.target} />
+          <h3 style={{ fontSize: 16 }}>{focusCat ? "Tren " + focusCat.name : "ESG Achievement Trend"}</h3>
+          <p className="sec-sub">Actual (garis penuh) · Forecast (putus-putus) · Target 100%{!focusCat && model.yoy2025 ? " · 2025 (titik-titik abu)" : ""}.</p>
+          <TrendChart months={months} actual={scope} forecast={scopeForecast} yoy={focusCat ? null : model.yoy2025} target={kpis.target} />
         </div>
         <div className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
-          <h3 style={{ fontSize: 16 }}>Index {months[idx]}</h3>
-          <Gauge value={totalIdx} target={kpis.target} cap={kpis.cap} />
+          <h3 style={{ fontSize: 16 }}>{focusCat ? focusCat.name : "Index"} · {months[idx]}</h3>
+          <Gauge value={scopeVal} target={kpis.target} cap={kpis.cap} />
           <div style={{ textAlign: "center" }} className="sub">
             Momentum: <b className={momentum >= 0 ? "pos" : "neg"}>{signedPct(momentum)}</b> vs bulan lalu
           </div>
@@ -106,10 +132,10 @@ export default function Dashboard({ model, news }) {
 
       {/* Scoring + Waterfall */}
       <div className="sec"><h2 className="sec-title">ESG Scoring</h2>
-        <p className="sec-sub">{mode === "manajemen" ? "Tampilan 6 kategori headline." : "Tampilan audit — 13 baris scoring berbobot."}</p></div>
+        <p className="sec-sub">{focusCat ? "Sub-metrik kategori " + focusCat.name + "." : mode === "manajemen" ? "Tampilan 6 kategori headline." : "Tampilan audit — 13 baris scoring berbobot."}</p></div>
       <div className="grid g-2">
         <div className="card scroll-x">
-          <ScoringTable model={model} idx={idx} mode={mode} contrib={contrib} />
+          <ScoringTable model={model} idx={idx} mode={mode} contrib={contrib} focus={focusCat} />
         </div>
         <div className="card">
           <h3 style={{ fontSize: 16 }}>Kontribusi ke Skor (Waterfall)</h3>
@@ -120,7 +146,7 @@ export default function Dashboard({ model, news }) {
       {/* Heatmap */}
       <div className="sec"><h2 className="sec-title">ESG Heatmap</h2>
         <p className="sec-sub">Pencapaian tiap metrik per bulan · hijau ≥100% · kuning 90–99% · merah &lt;90%.</p></div>
-      <div className="card scroll-x"><Heatmap months={months} categories={model.categories} /></div>
+      <div className="card scroll-x"><Heatmap months={months} categories={focusCat ? [focusCat] : model.categories} /></div>
 
       {/* Insight + News */}
       <div className="grid g-2" style={{ marginTop: 24 }}>
@@ -157,11 +183,13 @@ export default function Dashboard({ model, news }) {
   );
 }
 
-function ScoringTable({ model, idx, mode, contrib }) {
+function ScoringTable({ model, idx, mode, contrib, focus }) {
   const { metrics } = model;
   const shareOf = (id) => contrib.find((c) => c.id === id)?.share;
   let rows;
-  if (mode === "audit") {
+  if (focus) {
+    rows = focus.metrics.map((m) => ({ name: m.name, weight: m.bobot, ach: m.achievement[idx], point: m.points[idx], share: shareOf(m.id) }));
+  } else if (mode === "audit") {
     rows = metrics.map((m) => ({ name: m.name, weight: m.bobot, ach: m.achievement[idx], point: m.points[idx], share: shareOf(m.id) }));
   } else {
     rows = CATEGORY_ORDER.map((cat) => {
@@ -173,6 +201,7 @@ function ScoringTable({ model, idx, mode, contrib }) {
     });
   }
   const totalPoint = rows.reduce((a, r) => a + (r.point || 0), 0);
+  const totalWeight = focus ? focus.weight : 1;
   return (
     <table className="scoring">
       <thead><tr><th>Parameter</th><th>Bobot</th><th>Achv</th><th>Point</th><th>Kontribusi</th></tr></thead>
@@ -186,7 +215,7 @@ function ScoringTable({ model, idx, mode, contrib }) {
             <td>{r.share != null ? pct(r.share) : (totalPoint > 0 ? pct((r.point || 0) / totalPoint) : "–")}</td>
           </tr>
         ))}
-        <tr className="total"><td>TOTAL YTD</td><td>100%</td><td>–</td><td>{pct(totalPoint)}</td><td>100%</td></tr>
+        <tr className="total"><td>{focus ? "Total " + focus.name : "TOTAL YTD"}</td><td>{pct(totalWeight, 0)}</td><td>–</td><td>{pct(totalPoint)}</td><td>{focus ? "—" : "100%"}</td></tr>
       </tbody>
     </table>
   );

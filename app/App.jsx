@@ -9,6 +9,7 @@ import { Gallery } from "./components/Gallery.jsx";
 import { VelocityMarquee, PillarStack, StoryParallax } from "./components/scrolly.jsx";
 import Dashboard from "./components/Dashboard.jsx";
 import { LoginModal, AdminPanel } from "./components/Admin.jsx";
+import TVMode from "./components/TVMode.jsx";
 
 const STATIC_NEWS = [
   { date: "2025", title: "AREA 2025", desc: "Health Promotion & Investment in People — Asia Responsible Enterprise Awards." },
@@ -34,7 +35,15 @@ export default function App() {
   const [auth, setAuth] = useState(loadAuth);
   const [showLogin, setShowLogin] = useState(false);
   const [showPanel, setShowPanel] = useState(false);
+  const [tvMode, setTvMode] = useState(false);
   const lenis = useLenis();
+
+  const exportPDF = () => {
+    const prev = document.documentElement.dataset.theme || "dark";
+    document.documentElement.dataset.theme = "light";
+    window.print();
+    setTimeout(() => { document.documentElement.dataset.theme = prev; }, 800);
+  };
 
   const refresh = useCallback(() => {
     if (!API_URL) return Promise.resolve();
@@ -79,6 +88,8 @@ export default function App() {
           <span className="kick" title={source === "live" ? "Data dari Google Sheet" : "Data seed statis"}>
             <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 9, background: srcDot[0], marginRight: 6 }} />{srcDot[1]}
           </span>
+          <button className="btn" onClick={() => setTvMode(true)} title="Mode layar TV/lobi">TV</button>
+          <button className="btn" onClick={exportPDF} title="Cetak / simpan PDF">PDF</button>
           <button className="btn" onClick={toggle}>{theme === "dark" ? "Terang" : "Gelap"}</button>
           {auth
             ? <><span className="kick" style={{ color: "var(--accent)" }} title={"Login sebagai " + (auth.user?.nama || auth.user?.username)}>● MODE ADMIN</span><button className="btn" onClick={() => setShowPanel(true)}>Panel</button><button className="btn" onClick={logout}>Keluar</button></>
@@ -107,6 +118,7 @@ export default function App() {
 
       <Dashboard model={model} news={NEWS} />
 
+      {tvMode && <TVMode model={model} onExit={() => setTvMode(false)} />}
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} onSuccess={onLogin} />}
       {showPanel && auth && <AdminPanel token={auth.token} user={auth.user} model={model} onClose={() => setShowPanel(false)} onChanged={refresh} onExpired={onExpired} />}
     </>

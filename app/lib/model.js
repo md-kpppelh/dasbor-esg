@@ -121,7 +121,14 @@ export function buildModel(s = seed) {
   let gallery = [];
   try { const g = JSON.parse(config.galeri || "[]"); if (Array.isArray(g)) gallery = g; } catch (_) {}
 
-  return { months, metrics, series: { sum, total, byMonth }, lastIdx, forecast, contrib, categories, pillars, kpis, meta: s.meta, berita, gallery, config };
+  // YoY: Index ESG 2025 (config.index_2025 = 12 angka %, pisah koma) → array pecahan.
+  let yoy2025 = null;
+  if (config.index_2025) {
+    const arr = String(config.index_2025).split(",").map((x) => { const n = parseFloat(String(x).trim()); return isFinite(n) ? n / 100 : null; });
+    if (arr.some((v) => v != null)) yoy2025 = arr.concat(Array(12).fill(null)).slice(0, 12);
+  }
+
+  return { months, metrics, series: { sum, total, byMonth }, lastIdx, forecast, contrib, categories, pillars, kpis, meta: s.meta, berita, gallery, config, yoy2025 };
 }
 
 export const DEFAULT_GALLERY = [

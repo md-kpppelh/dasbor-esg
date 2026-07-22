@@ -19,6 +19,8 @@ export default function Dashboard({ model, news }) {
 
   const totalIdx = series.total[idx];
   const momentum = idx > 0 && totalIdx != null && series.total[idx - 1] != null ? totalIdx - series.total[idx - 1] : null;
+  const alerts = metrics.filter((m) => m.bobot > 0 && m.achievement[idx] != null && m.achievement[idx] < 1).sort((a, b) => a.achievement[idx] - b.achievement[idx]);
+  const forecastRisk = kpis.forecastYearEnd != null && kpis.forecastYearEnd < kpis.target;
 
   const contrib = useMemo(() => {
     const rows = metrics.map((m) => ({ id: m.id, name: m.name, short: SHORT[m.id] || m.name, point: m.points[idx] }));
@@ -45,6 +47,16 @@ export default function Dashboard({ model, news }) {
         <h2 className="sec-title">Dashboard ESG PELH 2026</h2>
         <p className="sec-sub">Data per {kpis.dataAsOf} · sumber terkunci ke formula Index ESG (Jun {pct(series.total[lastIdx])}).</p>
       </div>
+
+      {(alerts.length > 0 || forecastRisk) && (
+        <div className="alert-banner">
+          <span className="alert-dot" />
+          <div>
+            {alerts.length > 0 && <span><b>{alerts.length} parameter di bawah target</b> — {alerts.slice(0, 3).map((m) => `${m.name} (${pct(m.achievement[idx])})`).join(", ")}{alerts.length > 3 ? ", …" : ""}. </span>}
+            {forecastRisk && <span>Forecast akhir tahun <b>{pct(kpis.forecastYearEnd)}</b> di bawah target {pct(kpis.target)}.</span>}
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="filters card" style={{ padding: "12px 14px", marginBottom: 16 }}>
@@ -80,8 +92,8 @@ export default function Dashboard({ model, news }) {
       <div className="grid g-2" style={{ marginTop: 16 }}>
         <div className="card">
           <h3 style={{ fontSize: 16 }}>ESG Achievement Trend</h3>
-          <p className="sec-sub">Actual (garis penuh) · Forecast (putus-putus) · Target 100%.</p>
-          <TrendChart months={months} actual={series.total} forecast={forecast.linear} target={kpis.target} />
+          <p className="sec-sub">Actual (garis penuh) · Forecast (putus-putus) · Target 100%{model.yoy2025 ? " · 2025 (titik-titik abu)" : ""}.</p>
+          <TrendChart months={months} actual={series.total} forecast={forecast.linear} yoy={model.yoy2025} target={kpis.target} />
         </div>
         <div className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
           <h3 style={{ fontSize: 16 }}>Index {months[idx]}</h3>

@@ -27,7 +27,7 @@ export function Gauge({ value, target = 1, cap = 1.25, label }) {
 }
 
 /* ---------- Line chart bulanan: actual + forecast + target ---------- */
-export function TrendChart({ months, actual, forecast, target = 1, ymax = 1.3, height = 260 }) {
+export function TrendChart({ months, actual, forecast, yoy, target = 1, ymax = 1.3, height = 260 }) {
   const W = 720, H = height, pL = 40, pR = 16, pT = 16, pB = 26;
   const iw = W - pL - pR, ih = H - pT - pB;
   const x = (i) => pL + (i / (months.length - 1)) * iw;
@@ -45,6 +45,7 @@ export function TrendChart({ months, actual, forecast, target = 1, ymax = 1.3, h
         </g>
       ))}
       {months.map((m, i) => (<text key={m} x={x(i)} y={H - 8} fontSize="10" fill="var(--ink-2)" textAnchor="middle">{m}</text>))}
+      {yoy && <path d={path(yoy)} stroke="var(--ink-2)" strokeWidth="1.6" fill="none" strokeDasharray="2 4" opacity="0.7" />}
       <path d={path(fc)} stroke="var(--mint)" strokeWidth="2" fill="none" strokeDasharray="5 5" />
       <path d={path(actual)} stroke="var(--brand)" strokeWidth="2.5" fill="none" />
       {actual.map((v, i) => v != null && <circle key={i} cx={x(i)} cy={y(v)} r="3" fill="var(--brand)" />)}

@@ -222,6 +222,7 @@ const CONFIG_FIELDS = [
   ["judul", "Judul dashboard"], ["data_as_of", "Data per (YYYY-MM)"], ["target_komposit", "Target komposit (1 = 100%)"],
   ["cap", "Plafon (1.25 = 125%)"], ["rag_green", "Ambang hijau (1 = 100%)"], ["rag_yellow", "Ambang kuning (0.9 = 90%)"],
   ["forecast_metode", "Metode forecast (linear/ma)"], ["astra_2030_nonfosil", "Target Astra 2030 nonfosil (0.8)"],
+  ["index_2025", "Index ESG 2025 (12 angka %, pisah koma) — YoY"],
 ];
 function ConfigTab({ token, guard, flash, onChanged }) {
   const [key, setKey] = useState(CONFIG_FIELDS[0][0]);

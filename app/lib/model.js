@@ -28,7 +28,28 @@ export const FRAMEWORK = {
   comdev: { sdg: "SDG 1", gri: "GRI 413" },
 };
 
+// Timpa data dengan input bulanan dari website (CONFIG.esgdata) — tanpa mengubah seed asli.
+function applyEsgdata(s) {
+  const config = s.config || {};
+  let ed = {};
+  try { ed = JSON.parse(config.esgdata || "{}"); } catch (_) { return s; }
+  if (!ed || !Object.keys(ed).length) return s;
+  const data = {};
+  for (const k in s.data) data[k] = { aktual: (s.data[k].aktual || []).slice(), achievement: (s.data[k].achievement || []).slice() };
+  for (const mid in ed) {
+    if (!data[mid]) data[mid] = { aktual: Array(12).fill(null), achievement: Array(12).fill(null) };
+    for (const mo in ed[mid]) {
+      const i = Number(mo) - 1; if (i < 0 || i > 11) continue;
+      const e = ed[mid][mo] || {};
+      if (e.aktual != null) data[mid].aktual[i] = e.aktual;
+      if (e.achievement != null) data[mid].achievement[i] = e.achievement;
+    }
+  }
+  return { ...s, data };
+}
+
 export function buildModel(s = seed) {
+  s = applyEsgdata(s);
   const months = s.months;
   const { sum, total, byMonth } = E.computeSeries(s);
   const lastIdx = E.lastValidIndex(total);

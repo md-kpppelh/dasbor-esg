@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import * as api from "../lib/api.js";
 import { pct, num } from "../lib/format.js";
+import { METRIC_INPUTS, computeMetric } from "../lib/metricInputs.js";
 
 /* Login + panel Admin/User (jalur TULIS ke data bank). Wajib backend live (API_URL terisi). */
 
@@ -59,13 +60,14 @@ export function AdminPanel({ token, user, model, onClose, onChanged, onExpired }
         <div className="muted" style={{ fontSize: 12 }}>Masuk sebagai <b style={{ color: "var(--ink)" }}>{user?.nama || user?.username}</b></div>
 
         <div className="tabs">
-          {[["data", "Data"], ["galeri", "Galeri"], ["berita", "Berita"], ["config", "Konfigurasi"], ["audit", "Audit"]].map(([k, l]) => (
+          {[["input", "Input Bulanan"], ["data", "Data"], ["galeri", "Galeri"], ["berita", "Berita"], ["config", "Konfigurasi"], ["audit", "Audit"]].map(([k, l]) => (
             <button key={k} className="btn" style={tab === k ? { borderColor: "var(--accent)", color: "var(--accent)" } : {}} onClick={() => setTab(k)}>{l}</button>
           ))}
         </div>
 
         {notice && <div className={"notice " + (notice.ok ? "ok" : "err")}>{notice.msg}</div>}
 
+        {tab === "input" && <InputBulananTab token={token} model={model} guard={guard} flash={flash} onChanged={onChanged} />}
         {tab === "data" && <DataTab token={token} model={model} guard={guard} flash={flash} onChanged={onChanged} />}
         {tab === "galeri" && <GaleriTab token={token} model={model} guard={guard} flash={flash} onChanged={onChanged} />}
         {tab === "berita" && <BeritaTab token={token} model={model} guard={guard} flash={flash} onChanged={onChanged} />}
@@ -73,6 +75,71 @@ export function AdminPanel({ token, user, model, onClose, onChanged, onExpired }
         {tab === "audit" && <AuditTab token={token} />}
       </div>
     </div>
+  );
+}
+
+function InputBulananTab({ token, model, guard, flash, onChanged }) {
+  const months = model.months;
+  const existing = useMemo(() => { try { return JSON.parse(model.config?.esgdata || "{}"); } catch { return {}; } }, [model.config]);
+  const [month, setMonth] = useState(Math.min(model.lastIdx + 2, 12));
+  const [vals, setVals] = useState({});
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const v = {};
+    for (const mid in existing) { const e = existing[mid] && existing[mid][month]; if (e && e.raw) v[mid] = { ...e.raw }; }
+    setVals(v);
+  }, [month, existing]);
+
+  const setField = (mid, k, value) => setVals((s) => ({ ...s, [mid]: { ...(s[mid] || {}), [k]: value } }));
+
+  const save = async () => {
+    setBusy(true);
+    const merged = JSON.parse(JSON.stringify(existing));
+    let count = 0;
+    for (const m of model.metrics) {
+      if (!METRIC_INPUTS[m.id]) continue;
+      const out = computeMetric(m, vals[m.id] || {}, month);
+      if (!out || out.ach == null) continue;
+      if (!merged[m.id]) merged[m.id] = {};
+      merged[m.id][month] = { aktual: out.aktual, achievement: out.ach, raw: vals[m.id] };
+      count++;
+    }
+    const r = await api.updateConfig(token, "esgdata", JSON.stringify(merged));
+    setBusy(false);
+    if (guard(r)) { flash(true, `Tersimpan ${count} metrik untuk ${months[month - 1]} 2026.`); onChanged(); }
+  };
+
+  return (
+    <>
+      <p className="sec-sub" style={{ marginBottom: 6 }}>Isi angka mentah bulanan — website menghitung achievement & ESG index otomatis. Tak perlu buka Excel.</p>
+      <div className="field"><label>Bulan</label>
+        <select className="input" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+          {months.map((m, i) => <option key={m} value={i + 1}>{m} 2026</option>)}
+        </select>
+      </div>
+      {model.metrics.map((m) => {
+        const spec = METRIC_INPUTS[m.id]; if (!spec) return null;
+        const out = computeMetric(m, vals[m.id] || {}, month);
+        return (
+          <div key={m.id} style={{ borderTop: "1px solid var(--grid-line)", padding: "12px 0" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+              <b style={{ fontSize: 13 }}>{m.name} <span className="muted" style={{ fontWeight: 400 }}>· bobot {pct(m.bobot, 0)}</span></b>
+              <span className="mono" style={{ fontSize: 12, color: out && out.ach != null ? "var(--accent)" : "var(--muted)" }}>{out && out.ach != null ? "Achv " + pct(out.ach) : "—"}</span>
+            </div>
+            <div className="row2" style={{ marginTop: 8 }}>
+              {spec.fields.map((f) => (
+                <div className="field" key={f.k} style={{ margin: 0 }}>
+                  <label>{f.label}</label>
+                  <input className="input" type="number" step="any" value={vals[m.id] && vals[m.id][f.k] != null ? vals[m.id][f.k] : ""} onChange={(e) => setField(m.id, f.k, e.target.value)} />
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+      <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={busy} onClick={save}>{busy ? "Menyimpan…" : "Hitung & Simpan bulan ini"}</button>
+    </>
   );
 }
 

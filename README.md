@@ -41,11 +41,21 @@ app/
 data/seed-esg.json        data Jan–Jun 2026 (hasil ekstrak dari Excel master)
 engine/esg-engine.js      mesin rumus ESG
 tests/parity.test.js      uji paritas vs Excel
-apps-script/              Setup.gs + seed untuk data bank Google Sheet (backend — Fase 4)
+apps-script/              backend data bank Google Sheet (Fase 4)
+  Setup.gs                bangun 6 tab + isi seed (setupAwal)
+  Code.gs · Api.gs        router + baca publik (dashboard)
+  Auth.gs · Admin.gs      login/token + tulis data (auth)
 scripts/extract_seed.py   ekstraktor seed dari Excel master (butuh file sumber, tidak disertakan)
 ```
 
+## Backend Google Sheet (Fase 4)
+1. Buat Google Sheet baru → Extensions → Apps Script.
+2. Tempel isi semua file `apps-script/*.gs`. Jalankan `setupAwal()` (buat 6 tab + seed).
+3. Jalankan `setPassword('admin','SANDI_ANDA')` sekali untuk set sandi admin.
+4. Deploy → New deployment → Web app → *Execute as: Me*, *Who has access: Anyone* → salin URL.
+5. Isi URL itu ke `app/lib/config.js` → `API_URL`. Kosong = pakai seed statis (mode review).
+
 ## Catatan
-- Sumber data saat ini: `data/seed-esg.json` (statis, data s/d Juni 2026). Penyambungan ke data bank Google Sheet + login Admin/User = Fase 4.
+- Sumber data saat ini: `data/seed-esg.json` (statis, data s/d Juni 2026). Setelah `API_URL` diisi, app menarik dari data bank. Login Admin/User + panel edit = kelanjutan Fase 4.
 - Foto/video pada slot media disimpan di `localStorage` browser (demo); penyimpanan permanen menyusul di Fase 4/5.
 - File Excel sumber bersifat privat dan **tidak** disertakan di repo.

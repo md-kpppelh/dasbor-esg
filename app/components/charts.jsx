@@ -1,3 +1,4 @@
+import { useState, Fragment } from "react";
 import { pct, ragColor } from "../lib/format.js";
 
 /* ---------- Gauge setengah lingkaran (0..cap, tanda target) ---------- */
@@ -91,28 +92,47 @@ export function Sparkline({ data, ymax = 1.3, width = 130, height = 40, color = 
 }
 
 /* ---------- Heatmap 13 metrik x 12 bulan ---------- */
-export function Heatmap({ months, metrics }) {
-  const cols = `140px repeat(${months.length}, 1fr)`;
+// Heatmap 6 kategori; klik kategori → buka/tutup sub-metrik (drop down).
+export function Heatmap({ months, categories }) {
+  const [open, setOpen] = useState({});
+  const cols = `210px repeat(${months.length}, 1fr)`;
+  const ragOf = (v) => (v == null ? "none" : v >= 1 ? "green" : v >= 0.9 ? "yellow" : "red");
   return (
     <div className="heat" style={{ gridTemplateColumns: cols }}>
       <div />
       {months.map((m) => (<div key={m} className="hhead">{m}</div>))}
-      {metrics.map((mt) => (
-        <Row key={mt.id} mt={mt} />
-      ))}
+      {categories.map((cat) => {
+        const isOpen = !!open[cat.name];
+        const monthly = months.map((_, i) => catAch_(cat.metrics, i));
+        return (
+          <Fragment key={cat.name}>
+            <div className="hlabel hcat" onClick={() => setOpen((o) => ({ ...o, [cat.name]: !o[cat.name] }))} title="Klik untuk buka/tutup sub-metrik">
+              <span className="hcaret">{isOpen ? "▾" : "▸"}</span>{cat.name}
+            </div>
+            {monthly.map((v, i) => <HeatCell key={i} v={v} rag={ragOf(v)} name={cat.name} />)}
+            {isOpen && cat.metrics.map((mt) => (
+              <Fragment key={mt.id}>
+                <div className="hlabel hsub" title={mt.name}>{mt.name}</div>
+                {mt.rag.map((r, i) => <HeatCell key={i} v={mt.achievement[i]} rag={r} name={mt.name} />)}
+              </Fragment>
+            ))}
+          </Fragment>
+        );
+      })}
     </div>
   );
 }
-function Row({ mt }) {
+function HeatCell({ v, rag, name }) {
   return (
-    <>
-      <div className="hlabel" title={mt.name}>{mt.name.length > 20 ? mt.name.slice(0, 19) + "…" : mt.name}</div>
-      {mt.rag.map((r, i) => (
-        <div key={i} className="hc" style={{ background: ragColor(r), opacity: r === "none" ? 0.18 : 1 }}
-          title={`${mt.name}: ${mt.achievement[i] != null ? pct(mt.achievement[i]) : "belum ada data"}`}>
-          {mt.achievement[i] != null ? Math.round(mt.achievement[i] * 100) : ""}
-        </div>
-      ))}
-    </>
+    <div className="hc" style={{ background: ragColor(rag), opacity: rag === "none" ? 0.18 : 1 }}
+      title={`${name}: ${v != null ? pct(v) : "belum ada data"}`}>
+      {v != null ? Math.round(v * 100) : ""}
+    </div>
   );
+}
+// Capaian kategori per bulan = rata-rata tertimbang bobot sub-metrik.
+function catAch_(metrics, i) {
+  let w = 0, s = 0;
+  for (const m of metrics) { const a = m.achievement[i]; if (a != null && m.bobot > 0) { w += m.bobot; s += m.bobot * a; } }
+  return w > 0 ? s / w : null;
 }

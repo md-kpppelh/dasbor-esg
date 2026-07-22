@@ -15,7 +15,7 @@ export default function Dashboard({ model, news }) {
   const { months, metrics, series, kpis, forecast, lastIdx } = model;
   const [idx, setIdx] = useState(lastIdx);
   const [mode, setMode] = useState("manajemen"); // manajemen | audit
-  const [pilar, setPilar] = useState("all");
+  const [kategori, setKategori] = useState("all");
 
   const totalIdx = series.total[idx];
   const momentum = idx > 0 && totalIdx != null && series.total[idx - 1] != null ? totalIdx - series.total[idx - 1] : null;
@@ -28,7 +28,7 @@ export default function Dashboard({ model, news }) {
 
   const insights = useMemo(() => buildInsights(model), [model]);
   const wfItems = contrib.filter((c) => c.point > 0).sort((a, b) => b.point - a.point);
-  const shownMetrics = pilar === "all" ? metrics : metrics.filter((m) => m.pilar === pilar);
+  const shownMetrics = kategori === "all" ? metrics : metrics.filter((m) => m.kategori === kategori);
   const kpiList = [
     { lbl: "ESG Point Bulan Berjalan", to: totalIdx, fmt: (v) => pct(v), sub: months[idx] + " 2026" },
     { lbl: "ESG Point YTD", to: totalIdx, fmt: (v) => pct(v), sub: "s/d " + months[idx] },
@@ -53,11 +53,9 @@ export default function Dashboard({ model, news }) {
         <select value={idx} onChange={(e) => setIdx(+e.target.value)}>
           {months.map((m, i) => (<option key={m} value={i} disabled={series.total[i] == null && i > lastIdx}>{m}</option>))}
         </select>
-        <select value={pilar} onChange={(e) => setPilar(e.target.value)}>
-          <option value="all">Semua Pilar</option>
-          <option value="E">Environmental</option>
-          <option value="S">Social</option>
-          <option value="G" disabled>Governance (belum ada metrik)</option>
+        <select value={kategori} onChange={(e) => setKategori(e.target.value)}>
+          <option value="all">Semua Kategori</option>
+          {CATEGORY_ORDER.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
         <span style={{ marginLeft: "auto" }} className="muted" />
         <div className="seg">
@@ -110,7 +108,7 @@ export default function Dashboard({ model, news }) {
       {/* Heatmap */}
       <div className="sec"><h2 className="sec-title">ESG Heatmap</h2>
         <p className="sec-sub">Pencapaian tiap metrik per bulan · hijau ≥100% · kuning 90–99% · merah &lt;90%.</p></div>
-      <div className="card scroll-x"><Heatmap months={months} metrics={metrics} /></div>
+      <div className="card scroll-x"><Heatmap months={months} categories={model.categories} /></div>
 
       {/* Insight + News */}
       <div className="grid g-2" style={{ marginTop: 24 }}>
@@ -133,7 +131,7 @@ export default function Dashboard({ model, news }) {
 
       {/* Parameter panels */}
       <div className="sec"><h2 className="sec-title">Parameter ESG</h2>
-        <p className="sec-sub">{pilar === "all" ? "Enam kategori." : pilar === "E" ? "Environmental." : "Social."}</p></div>
+        <p className="sec-sub">{kategori === "all" ? "Enam kategori ESG." : kategori}</p></div>
       <div className="grid g-3">
         {CATEGORY_ORDER.filter((c) => shownMetrics.some((m) => m.kategori === c)).map((cat) => (
           <ParamCard key={cat} cat={cat} metrics={shownMetrics.filter((m) => m.kategori === cat)} idx={idx} months={months} />

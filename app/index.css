@@ -166,6 +166,10 @@ table.scoring tr.total td { font-weight: 500; border-top: 1px solid var(--ink-2)
 .heat { display: grid; gap: 3px; }
 .heat .hc { height: 26px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 10px; font-weight: 500; color: rgba(0,0,0,.7); }
 .heat .hlabel { font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); display: flex; align-items: center; padding-right: 8px; }
+.heat .hcat { color: var(--ink); cursor: pointer; user-select: none; }
+.heat .hcat:hover { color: var(--accent); }
+.heat .hcaret { display: inline-block; width: 16px; color: var(--accent); }
+.heat .hsub { padding-left: 18px; font-size: 10px; color: var(--ink-2); }
 .heat .hhead { font-family: var(--font-mono); font-size: 10px; color: var(--muted); text-align: center; text-transform: uppercase; }
 
 /* ---------- Insight ---------- */

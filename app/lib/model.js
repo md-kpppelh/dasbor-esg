@@ -90,10 +90,32 @@ export function buildModel(s = seed) {
     forecastYearEnd: forecast.linear[11],
     lastMonth: months[lastIdx],
     lastIdx,
-    dataAsOf: s.meta.dataAsOf,
+    dataAsOf: periodLabel(s.meta.dataAsOf),
   };
 
-  return { months, metrics, series: { sum, total, byMonth }, lastIdx, forecast, contrib, categories, pillars, kpis, meta: s.meta };
+  const berita = (s.berita || []).map((b) => ({ date: fmtYear(b.date), title: b.title, desc: b.desc, url: b.url }));
+
+  return { months, metrics, series: { sum, total, byMonth }, lastIdx, forecast, contrib, categories, pillars, kpis, meta: s.meta, berita };
+}
+
+// Sheet kadang menyimpan tanggal sebagai ISO — ambil tahunnya saja untuk tampilan.
+function fmtYear(v) {
+  if (!v) return "";
+  const m = String(v).match(/(\d{4})/);
+  return m ? m[1] : String(v);
+}
+
+// "2026-06" atau ISO → "Jun 2026" (zona Jakarta).
+export function periodLabel(v) {
+  if (!v) return "";
+  const s = String(v);
+  if (/^\d{4}-\d{2}$/.test(s)) {
+    const [y, mo] = s.split("-").map(Number);
+    return ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"][mo - 1] + " " + y;
+  }
+  const d = new Date(s);
+  if (!isNaN(d)) return d.toLocaleDateString("id-ID", { month: "short", year: "numeric", timeZone: "Asia/Jakarta" });
+  return s;
 }
 
 function avgAch(ms, idx) {

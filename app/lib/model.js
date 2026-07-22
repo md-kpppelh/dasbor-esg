@@ -95,8 +95,19 @@ export function buildModel(s = seed) {
 
   const berita = (s.berita || []).map((b) => ({ date: fmtYear(b.date), title: b.title, desc: b.desc, url: b.url }));
 
-  return { months, metrics, series: { sum, total, byMonth }, lastIdx, forecast, contrib, categories, pillars, kpis, meta: s.meta, berita };
+  // Galeri permanen dari CONFIG (key 'galeri' = JSON array). Fallback ke contoh bila kosong.
+  const config = s.config || {};
+  let gallery = [];
+  try { const g = JSON.parse(config.galeri || "[]"); if (Array.isArray(g)) gallery = g; } catch (_) {}
+
+  return { months, metrics, series: { sum, total, byMonth }, lastIdx, forecast, contrib, categories, pillars, kpis, meta: s.meta, berita, gallery, config };
 }
+
+export const DEFAULT_GALLERY = [
+  { id: "g1", judul: "Reklamasi & lingkungan", kategori: "Lingkungan" },
+  { id: "g2", judul: "K3 / keselamatan kerja", kategori: "Sosial" },
+  { id: "g3", judul: "Community development", kategori: "Sosial" },
+];
 
 // Sheet kadang menyimpan tanggal sebagai ISO — ambil tahunnya saja untuk tampilan.
 function fmtYear(v) {

@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { buildModel, model as seedModel } from "./lib/model.js";
+import { buildModel, model as seedModel, DEFAULT_GALLERY } from "./lib/model.js";
 import { fetchDashboard } from "./lib/api.js";
 import { API_URL } from "./lib/config.js";
 import { pct, num } from "./lib/format.js";
 import { useLenis, Reveal } from "./lib/anim.jsx";
 import Hero from "./three/Hero.jsx";
-import { MediaGallery } from "./components/Media.jsx";
+import { Gallery } from "./components/Gallery.jsx";
 import { VelocityMarquee, PillarStack, StoryParallax } from "./components/scrolly.jsx";
 import Dashboard from "./components/Dashboard.jsx";
 import { LoginModal, AdminPanel } from "./components/Admin.jsx";
@@ -15,12 +15,6 @@ const STATIC_NEWS = [
   { date: "2025", title: "HR Asia 2025", desc: "Best Companies to Work For in Asia." },
   { date: "2022", title: "ISDA 2022 — 7 penghargaan", desc: "Indonesian SDGs Award untuk program keberlanjutan." },
 ];
-const GALLERY = [
-  { id: "g1", label: "Reklamasi & lingkungan", tag: "ENVIRONMENTAL", aspect: "4 / 3" },
-  { id: "g2", label: "K3 / keselamatan kerja", tag: "SOCIAL", aspect: "4 / 3" },
-  { id: "g3", label: "Community development", tag: "SOCIAL", aspect: "4 / 3" },
-];
-
 function SectionHead({ n, title, sub }) {
   return (
     <Reveal className="sec">
@@ -67,6 +61,7 @@ export default function App() {
     return { ...lead, kategori: c.name };
   }), [model]);
   const NEWS = model.berita && model.berita.length ? model.berita : STATIC_NEWS;
+  const galleryItems = model.gallery && model.gallery.length ? model.gallery : DEFAULT_GALLERY;
 
   const toggle = () => { const t = theme === "dark" ? "light" : "dark"; setTheme(t); document.documentElement.dataset.theme = t; };
   const skip = () => { const el = document.getElementById("dashboard"); if (!el) return; lenis.current ? lenis.current.scrollTo(el, { offset: -16 }) : el.scrollIntoView({ behavior: "smooth" }); };
@@ -96,8 +91,8 @@ export default function App() {
       <VelocityMarquee items={MARQUEE} />
 
       <section className="wrap">
-        <SectionHead n="01 / GALERI" title="Galeri & dokumentasi ESG" sub="Unggah foto atau video kegiatan — reklamasi, K3, community development. Bisa file atau tautan (mp4/YouTube/Vimeo)." />
-        <Reveal delay={0.08}><MediaGallery items={GALLERY} editable={!!auth} /></Reveal>
+        <SectionHead n="01 / GALERI" title="Galeri &amp; dokumentasi ESG" sub="Foto &amp; video kegiatan ESG. Geser ke samping untuk menjelajah. Admin menambah/mengubah lewat Panel → Galeri." />
+        <Gallery items={galleryItems} />
       </section>
 
       <section className="wrap">

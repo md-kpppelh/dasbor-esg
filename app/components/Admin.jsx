@@ -59,7 +59,7 @@ export function AdminPanel({ token, user, model, onClose, onChanged, onExpired }
         <div className="muted" style={{ fontSize: 12 }}>Masuk sebagai <b style={{ color: "var(--ink)" }}>{user?.nama || user?.username}</b></div>
 
         <div className="tabs">
-          {[["data", "Data"], ["berita", "Berita"], ["config", "Konfigurasi"], ["audit", "Audit"]].map(([k, l]) => (
+          {[["data", "Data"], ["galeri", "Galeri"], ["berita", "Berita"], ["config", "Konfigurasi"], ["audit", "Audit"]].map(([k, l]) => (
             <button key={k} className="btn" style={tab === k ? { borderColor: "var(--accent)", color: "var(--accent)" } : {}} onClick={() => setTab(k)}>{l}</button>
           ))}
         </div>
@@ -67,6 +67,7 @@ export function AdminPanel({ token, user, model, onClose, onChanged, onExpired }
         {notice && <div className={"notice " + (notice.ok ? "ok" : "err")}>{notice.msg}</div>}
 
         {tab === "data" && <DataTab token={token} model={model} guard={guard} flash={flash} onChanged={onChanged} />}
+        {tab === "galeri" && <GaleriTab token={token} model={model} guard={guard} flash={flash} onChanged={onChanged} />}
         {tab === "berita" && <BeritaTab token={token} model={model} guard={guard} flash={flash} onChanged={onChanged} />}
         {tab === "config" && <ConfigTab token={token} guard={guard} flash={flash} onChanged={onChanged} />}
         {tab === "audit" && <AuditTab token={token} />}
@@ -169,6 +170,46 @@ function ConfigTab({ token, guard, flash, onChanged }) {
       </div>
       <div className="field"><label>Nilai baru</label><input className="input" value={value} onChange={(e) => setValue(e.target.value)} /></div>
       <button className="btn btn-primary" onClick={save} disabled={value === ""}>Simpan</button>
+    </>
+  );
+}
+
+function GaleriTab({ token, model, guard, flash, onChanged }) {
+  const [items, setItems] = useState(model.gallery || []);
+  const [f, setF] = useState({ judul: "", kategori: "", url: "" });
+  const [busy, setBusy] = useState(false);
+  const persist = async (next) => {
+    setBusy(true);
+    const r = await api.updateConfig(token, "galeri", JSON.stringify(next));
+    setBusy(false);
+    if (guard(r)) { setItems(next); onChanged(); return true; }
+    return false;
+  };
+  const add = async () => {
+    if (!f.url) { flash(false, "URL foto/video wajib diisi."); return; }
+    const next = [...items, { id: "g" + Date.now(), judul: f.judul, kategori: f.kategori, url: f.url.trim() }];
+    if (await persist(next)) { flash(true, "Ditambahkan ke galeri."); setF({ judul: "", kategori: "", url: "" }); }
+  };
+  const del = async (id) => { if (await persist(items.filter((x) => x.id !== id))) flash(true, "Item dihapus."); };
+  return (
+    <>
+      <p className="sec-sub" style={{ marginBottom: 6 }}>Tambah foto/video lewat TAUTAN — tersimpan permanen & tampil untuk semua pengunjung.</p>
+      <p className="sec-sub" style={{ marginBottom: 14, color: "var(--muted)" }}>Punya file di komputer? Unggah dulu ke Google Drive/Photos (set "siapa saja dengan link"), lalu tempel tautannya di sini.</p>
+      <div className="row2">
+        <div className="field"><label>Judul</label><input className="input" value={f.judul} onChange={(e) => setF({ ...f, judul: e.target.value })} /></div>
+        <div className="field"><label>Kategori</label><input className="input" value={f.kategori} onChange={(e) => setF({ ...f, kategori: e.target.value })} placeholder="Lingkungan / Sosial" /></div>
+      </div>
+      <div className="field"><label>URL foto / video</label><input className="input" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} placeholder="https://… .jpg / .mp4 / YouTube" /></div>
+      <button className="btn btn-primary" onClick={add} disabled={busy || !f.url}>{busy ? "Menyimpan…" : "Tambah ke galeri"}</button>
+      <div style={{ marginTop: 18 }}>
+        {items.length === 0 && <div className="muted" style={{ fontSize: 12 }}>Belum ada item galeri.</div>}
+        {items.map((it) => (
+          <div key={it.id} className="news-item">
+            <div style={{ flex: 1, minWidth: 0 }}><b>{it.judul || "Tanpa judul"}</b><div className="muted" style={{ fontSize: 11, wordBreak: "break-all" }}>{it.kategori ? it.kategori + " · " : ""}{it.url}</div></div>
+            <button className="btn" onClick={() => del(it.id)}>Hapus</button>
+          </div>
+        ))}
+      </div>
     </>
   );
 }

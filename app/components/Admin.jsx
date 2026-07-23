@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import * as api from "../lib/api.js";
 import { pct, num } from "../lib/format.js";
 import { METRIC_INPUTS, computeMetric } from "../lib/metricInputs.js";
@@ -242,38 +242,89 @@ function ConfigTab({ token, guard, flash, onChanged }) {
   );
 }
 
+// Kompres gambar di browser agar muat 1 sel Sheet (<~46rb char data URL). null bila tetap kebesaran.
+function compressImage(file, maxW = 900, maxLen = 46000) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > maxW) { h = Math.round((h * maxW) / w); w = maxW; }
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h);
+      let q = 0.72, url = c.toDataURL("image/jpeg", q);
+      while (url.length > maxLen && q > 0.2) { q -= 0.1; url = c.toDataURL("image/jpeg", q); }
+      URL.revokeObjectURL(img.src);
+      resolve(url.length > maxLen ? null : url);
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 function GaleriTab({ token, model, guard, flash, onChanged }) {
   const [items, setItems] = useState(model.gallery || []);
   const [f, setF] = useState({ judul: "", kategori: "", url: "" });
   const [busy, setBusy] = useState(false);
-  const persist = async (next) => {
-    setBusy(true);
-    const r = await api.updateConfig(token, "galeri", JSON.stringify(next));
-    setBusy(false);
+  const fileRef = useRef(null);
+
+  // Item 'stored' disimpan tanpa data URL di array galeri (gambar ada di galimg_<id>).
+  const persistItems = async (next) => {
+    const clean = next.map((x) => (x.stored ? { id: x.id, judul: x.judul, kategori: x.kategori, stored: true } : x));
+    const r = await api.updateConfig(token, "galeri", JSON.stringify(clean));
     if (guard(r)) { setItems(next); onChanged(); return true; }
     return false;
   };
-  const add = async () => {
-    if (!f.url) { flash(false, "URL foto/video wajib diisi."); return; }
-    const next = [...items, { id: "g" + Date.now(), judul: f.judul, kategori: f.kategori, url: f.url.trim() }];
-    if (await persist(next)) { flash(true, "Ditambahkan ke galeri."); setF({ judul: "", kategori: "", url: "" }); }
+
+  const onFile = async (e) => {
+    const file = e.target.files && e.target.files[0]; e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { flash(false, "Untuk video pakai kolom Tautan (YouTube/mp4)."); return; }
+    setBusy(true);
+    let dataUrl = null;
+    try { dataUrl = await compressImage(file); } catch { dataUrl = null; }
+    if (!dataUrl) { setBusy(false); flash(false, "Gambar gagal/terlalu besar. Coba foto lain."); return; }
+    const id = "g" + Date.now();
+    const r1 = await api.updateConfig(token, "galimg_" + id, dataUrl);
+    if (!guard(r1)) { setBusy(false); return; }
+    const ok = await persistItems([...items, { id, judul: f.judul, kategori: f.kategori, stored: true, url: dataUrl }]);
+    setBusy(false);
+    if (ok) { flash(true, "Foto terunggah ke galeri."); setF({ judul: "", kategori: "", url: "" }); }
   };
-  const del = async (id) => { if (await persist(items.filter((x) => x.id !== id))) flash(true, "Item dihapus."); };
+
+  const addUrl = async () => {
+    if (!f.url) { flash(false, "URL wajib diisi (untuk video/tautan)."); return; }
+    setBusy(true);
+    const ok = await persistItems([...items, { id: "g" + Date.now(), judul: f.judul, kategori: f.kategori, url: f.url.trim() }]);
+    setBusy(false);
+    if (ok) { flash(true, "Ditambahkan ke galeri."); setF({ judul: "", kategori: "", url: "" }); }
+  };
+
+  const del = async (id) => {
+    const item = items.find((x) => x.id === id);
+    if (await persistItems(items.filter((x) => x.id !== id))) {
+      if (item && item.stored) api.updateConfig(token, "galimg_" + id, "");
+      flash(true, "Item dihapus.");
+    }
+  };
+
   return (
     <>
-      <p className="sec-sub" style={{ marginBottom: 6 }}>Tambah foto/video lewat TAUTAN — tersimpan permanen & tampil untuk semua pengunjung.</p>
-      <p className="sec-sub" style={{ marginBottom: 14, color: "var(--muted)" }}>Punya file di komputer? Unggah dulu ke Google Drive/Photos (set "siapa saja dengan link"), lalu tempel tautannya di sini.</p>
+      <p className="sec-sub" style={{ marginBottom: 14 }}>Foto: unggah langsung dari komputer (otomatis dikompres). Video: pakai Tautan (YouTube/mp4). Tersimpan permanen & tampil untuk semua.</p>
       <div className="row2">
         <div className="field"><label>Judul</label><input className="input" value={f.judul} onChange={(e) => setF({ ...f, judul: e.target.value })} /></div>
         <div className="field"><label>Kategori</label><input className="input" value={f.kategori} onChange={(e) => setF({ ...f, kategori: e.target.value })} placeholder="Lingkungan / Sosial" /></div>
       </div>
-      <div className="field"><label>URL foto / video</label><input className="input" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} placeholder="https://… .jpg / .mp4 / YouTube" /></div>
-      <button className="btn btn-primary" onClick={add} disabled={busy || !f.url}>{busy ? "Menyimpan…" : "Tambah ke galeri"}</button>
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <button className="btn btn-primary" onClick={() => fileRef.current.click()} disabled={busy}>{busy ? "Memproses…" : "⬆ Unggah foto"}</button>
+        <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={onFile} />
+      </div>
+      <div className="field"><label>Atau tautan (video / URL)</label><input className="input" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} placeholder="https://… .mp4 / YouTube / .jpg" /></div>
+      <button className="btn" onClick={addUrl} disabled={busy || !f.url}>Tambah dari tautan</button>
       <div style={{ marginTop: 18 }}>
         {items.length === 0 && <div className="muted" style={{ fontSize: 12 }}>Belum ada item galeri.</div>}
         {items.map((it) => (
           <div key={it.id} className="news-item">
-            <div style={{ flex: 1, minWidth: 0 }}><b>{it.judul || "Tanpa judul"}</b><div className="muted" style={{ fontSize: 11, wordBreak: "break-all" }}>{it.kategori ? it.kategori + " · " : ""}{it.url}</div></div>
+            <div style={{ flex: 1, minWidth: 0 }}><b>{it.judul || "Tanpa judul"}</b><div className="muted" style={{ fontSize: 11, wordBreak: "break-all" }}>{it.kategori ? it.kategori + " · " : ""}{it.stored ? "foto terunggah" : it.url}</div></div>
             <button className="btn" onClick={() => del(it.id)}>Hapus</button>
           </div>
         ))}

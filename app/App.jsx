@@ -88,11 +88,15 @@ export default function App() {
           <span className="kick" title={source === "live" ? "Data dari Google Sheet" : "Data seed statis"}>
             <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 9, background: srcDot[0], marginRight: 6 }} />{srcDot[1]}
           </span>
-          <button className="btn" onClick={() => setTvMode(true)} title="Mode layar TV/lobi">TV</button>
-          <button className="btn" onClick={exportPDF} title="Cetak / simpan PDF">PDF</button>
           <button className="btn" onClick={toggle}>{theme === "dark" ? "Terang" : "Gelap"}</button>
           {auth
-            ? <><span className="kick" style={{ color: "var(--accent)" }} title={"Login sebagai " + (auth.user?.nama || auth.user?.username)}>● MODE ADMIN</span><button className="btn" onClick={() => setShowPanel(true)}>Panel</button><button className="btn" onClick={logout}>Keluar</button></>
+            ? <>
+                <span className="kick" style={{ color: "var(--accent)" }} title={"Login sebagai " + (auth.user?.nama || auth.user?.username)}>● MODE ADMIN</span>
+                <button className="btn" onClick={() => setTvMode(true)} title="Mode layar TV/lobi">TV</button>
+                <button className="btn" onClick={exportPDF} title="Cetak / simpan PDF">PDF</button>
+                <button className="btn" onClick={() => setShowPanel(true)}>Panel</button>
+                <button className="btn" onClick={logout}>Keluar</button>
+              </>
             : <button className="btn" onClick={() => setShowLogin(true)} disabled={!API_URL} title={API_URL ? "" : "Backend belum tersambung"}>Login</button>}
           <button className="btn btn-primary" onClick={skip}>Dashboard →</button>
         </div>

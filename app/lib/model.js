@@ -120,6 +120,8 @@ export function buildModel(s = seed) {
   const config = s.config || {};
   let gallery = [];
   try { const g = JSON.parse(config.galeri || "[]"); if (Array.isArray(g)) gallery = g; } catch (_) {}
+  // Foto yang diunggah langsung disimpan di CONFIG key `galimg_<id>` (data URL terkompres).
+  gallery = gallery.map((it) => (it.stored ? { ...it, url: config["galimg_" + it.id] || "" } : it));
 
   // YoY: Index ESG 2025 (config.index_2025 = 12 angka %, pisah koma) → array pecahan.
   let yoy2025 = null;
